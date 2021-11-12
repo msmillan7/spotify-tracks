@@ -30,16 +30,16 @@ apply(df, 2, function(x) sum(is.na(x) | x == ''))
 
 
 
-
 ```{r}
 ## Scatterplots for infinite variables vs popularity
 
 tracks.df <- df[,c("acousticness", "danceability", "available_markets", "country", "duration_ms", "energy", "instrumentalness", "liveness", "loudness", "lyrics", "speechiness", "valence", "key", "tempo", "popularity")]
 
-# data transformations
-tracks.df$popularity <- tracks.df$popularity/100
-names(tracks.df)[3] <- 'duration_min'
-tracks.df$duration_min <- tracks.df$duration_min/1000/60
+# Data transformations
+#Re-scale popularity so that it is measured between o and 1, as the rest of the attributes do.
+tracks.df$popularity <- tracks.df$popularity/100 
+#Create new column to have the duration in minutes
+tracks.df["duration_min"] <- tracks.df$duration_ms/1000/60
 
 # display r correlations on plots
 upper.panel <- function(x,y){
