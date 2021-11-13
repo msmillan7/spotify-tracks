@@ -1,0 +1,98 @@
+---
+title: "Untitled"
+author: "Richard Bridges"
+date: "11/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+#read in data and check for NaNs
+df <- read.csv("spotify_tracks.csv")
+head(df)
+str(df)
+
+#apply(df, 2, function(x) sum(is.na(x)))
+apply(df, 2, function(x) sum(is.finite(x)))
+apply(df, 2, function(x) sum(is.na(x) | x == ''))
+
+```
+
+
+```{r}
+#subset by available 
+
+```
+
+
+
+```{r}
+## Scatterplots for infinite variables vs popularity
+
+tracks.df <- df[,c("acousticness", "danceability", "available_markets", "country", "duration_ms", "energy", "instrumentalness", "liveness", "loudness", "lyrics", "speechiness", "valence", "key", "tempo", "popularity")]
+
+# Data transformations
+#Re-scale popularity so that it is measured between o and 1, as the rest of the attributes do.
+tracks.df$popularity <- tracks.df$popularity/100 
+#Create new column to have the duration in minutes
+tracks.df["duration_min"] <- tracks.df$duration_ms/1000/60
+
+# display r correlations on plots
+upper.panel <- function(x,y){
+  points(x,y, pch=1)
+  r <- round(cor(x,y), digits = 2)
+  txt <- paste0("R = ", r)
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  text(0.5, 0.9, txt)
+}
+
+# scatter plots - arranged 3 x 3 for clarity
+pairs(tracks.df[c(15, 1:2)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(tracks.df[c(15, 13:14)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(tracks.df[c(15, 5:6)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(tracks.df[c(15, 7:8)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(tracks.df[c(15, 9:10)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(tracks.df[c(15, 11:12)], lower.panel = NULL,
+      upper.panel = upper.panel)
+```
+Nothing correlates strongly with popularity.
+
+```{r}
+table(tracks.df['available_markets'])
+```
+
+```{r}
+## pairwise correlation table for all columns with meaningful numeric data
+
+# data transformation to numeric type
+tracks.df$lyrics <- as.numeric(tracks.df$lyrics)
+tracks.df$country <- as.numeric(tracks.df$country)
+
+# correlation table
+cor(tracks.df, tracks.df)
+
+```
+
+Correlations summary:
+
+Energy and acousticness have a negative -0.71 correlation, loudness and energy have a 0.78 correlation, lyrics and instrumentalness have a 0.51, loudness and acousticness have a -0.58, and valence and danceability have a 0.52.
+
+```{r}
+
+```
+

@@ -1,0 +1,74 @@
+---
+title: "Untitled"
+author: "Richard Bridges"
+date: "11/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+#read in data and check for NaNs
+df <- read.csv("spotify_tracks.csv")
+head(df)
+str(df)
+
+apply(df, 2, function(x) sum(is.na(x)))
+
+```
+
+```{r}
+## Scatterplots for infinite variables vs popularity
+
+df.sub.scatter <- df[,c("acousticness", "danceability", "duration_ms", "energy", "instrumentalness", "liveness", "loudness", "lyrics", "speechiness", "valence", "key", "tempo", "popularity")]
+
+# data transformations
+df.sub.scatter$popularity <- df.sub.scatter$popularity/100
+names(df.sub.scatter)[3] <- 'duration_min'
+df.sub.scatter$duration_min <- df.sub.scatter$duration_min/1000/60
+
+# display r correlations on plots
+upper.panel <- function(x,y){
+  points(x,y, pch=1)
+  r <- round(cor(x,y), digits = 2)
+  txt <- paste0("R = ", r)
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  text(0.5, 0.9, txt)
+}
+
+# scatter plots
+pairs(df.sub.scatter[c(13, 1:2)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(df.sub.scatter[c(13, 3:4)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(df.sub.scatter[c(13, 5:6)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(df.sub.scatter[c(13, 7:8)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(df.sub.scatter[c(13, 9:10)], lower.panel = NULL,
+      upper.panel = upper.panel)
+
+pairs(df.sub.scatter[c(13, 11:12)], lower.panel = NULL,
+      upper.panel = upper.panel)
+```
+
+```{r}
+## pairwise correlation table for all columns
+
+# data transformation to numeric type
+df.sub.scatter$lyrics <- as.numeric(df.sub.scatter$lyrics)
+
+# correlation table
+cor(df.sub.scatter, df.sub.scatter)
+
+```
+
+
