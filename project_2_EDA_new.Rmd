@@ -13,23 +13,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #read in data and check for NaNs
 df <- read.csv("spotify_tracks.csv")
-head(df)
-str(df)
 
 #apply(df, 2, function(x) sum(is.na(x)))
 apply(df, 2, function(x) sum(is.finite(x)))
 apply(df, 2, function(x) sum(is.na(x) | x == ''))
 
 ```
-
-
-```{r}
-#subset by available 
-
-```
-
-
-
 
 ```{r}
 ## Scatterplots for infinite variables vs popularity
@@ -38,61 +27,202 @@ tracks.df <- df[,c("acousticness", "danceability", "available_markets", "country
 
 # data transformations
 tracks.df$popularity <- tracks.df$popularity/100
-names(tracks.df)[3] <- 'duration_min'
-tracks.df$duration_min <- tracks.df$duration_min/1000/60
+tracks.df$duration_scaled <- tracks.df$duration_ms/5505831
+tracks.df$loudness_scaled <- (tracks.df$loudness + 60)/62.719
 
+tracks.df <- tracks.df[,c("acousticness", "danceability", "available_markets", "country", "duration_scaled", "energy", "instrumentalness", "liveness", "loudness_scaled", "lyrics", "speechiness", "valence", "key", "tempo", "popularity")]
+
+
+##Plots below not to be included - for reference only
 # display r correlations on plots
-upper.panel <- function(x,y){
-  points(x,y, pch=1)
-  r <- round(cor(x,y), digits = 2)
-  txt <- paste0("R = ", r)
-  usr <- par("usr"); on.exit(par(usr))
-  par(usr = c(0, 1, 0, 1))
-  text(0.5, 0.9, txt)
-}
+# upper.panel <- function(x,y){
+#   points(x,y, pch=1)
+#   r <- round(cor(x,y), digits = 2)
+#   txt <- paste0("R = ", r)
+#   usr <- par("usr"); on.exit(par(usr))
+#   par(usr = c(0, 1, 0, 1))
+#   text(0.5, 0.9, txt)
+# }
 
 # scatter plots - arranged 3 x 3 for clarity
-pairs(tracks.df[c(15, 1:2)], lower.panel = NULL,
-      upper.panel = upper.panel)
-
-pairs(tracks.df[c(15, 13:14)], lower.panel = NULL,
-      upper.panel = upper.panel)
-
-pairs(tracks.df[c(15, 5:6)], lower.panel = NULL,
-      upper.panel = upper.panel)
-
-pairs(tracks.df[c(15, 7:8)], lower.panel = NULL,
-      upper.panel = upper.panel)
-
-pairs(tracks.df[c(15, 9:10)], lower.panel = NULL,
-      upper.panel = upper.panel)
-
-pairs(tracks.df[c(15, 11:12)], lower.panel = NULL,
-      upper.panel = upper.panel)
-```
-Nothing correlates strongly with popularity.
-
-```{r}
-table(tracks.df['available_markets'])
+# pairs(tracks.df[c(15, 1:2)], lower.panel = NULL,
+#       upper.panel = upper.panel)
+# 
+# pairs(tracks.df[c(15, 13:14)], lower.panel = NULL,
+#       upper.panel = upper.panel)
+# 
+# pairs(tracks.df[c(15, 5:6)], lower.panel = NULL,
+#       upper.panel = upper.panel)
+# 
+# pairs(tracks.df[c(15, 7:8)], lower.panel = NULL,
+#       upper.panel = upper.panel)
+# 
+# pairs(tracks.df[c(15, 9:10)], lower.panel = NULL,
+#       upper.panel = upper.panel)
+# 
+# pairs(tracks.df[c(15, 11:12)], lower.panel = NULL,
+#       upper.panel = upper.panel)
 ```
 
+Bargraph to show correlation popularity against continuous variables
 ```{r}
-## pairwise correlation table for all columns with meaningful numeric data
+library(dplyr)
+library(corrr)
+library(ggplot2)
 
-# data transformation to numeric type
-tracks.df$lyrics <- as.numeric(tracks.df$lyrics)
-tracks.df$country <- as.numeric(tracks.df$country)
+# Include on columns with continuous quantitative data
+tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key))
 
-# correlation table
-cor(tracks.df, tracks.df)
+# Create bar chart of pearson correlation scores
+tracks_onlycontinuous.df %>% correlate() %>% focus(popularity) %>%
+  ggplot(aes(x = term, y = popularity)) +
+  ggtitle("Correlation Between Popularity and Categories\n
+    of Continuous Variables") +
+    geom_bar(stat = "identity") +
+    ylab("Pearson Correlation") +
+    xlab("Variable") +
+    ylim(-1, 1) +
+    geom_col(aes(fill = popularity)) + 
+    scale_fill_gradient2(low = "blue", 
+                       high = "red", 
+                       mid = "white",
+                       midpoint = median(0))+
+    theme(
+      legend.position = "none",
+      plot.title = element_text(size = 16, hjust = 0.5),
+      axis.text.y = element_text(size = 12),
+      axis.text.x = element_text(angle = 45, vjust = 1, 
+        size = 12, hjust = 1),
+      axis.title.y = element_text(size = 14),
+      axis.title.x = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank()
+    )
+```
+Conclusion: Nothing correlates strongly with popularity.
 
+Popularity vs. Key (only categorical variable)
+```{r}
+# Key was left out of previous plot because it is a discrete variable
+
+# Violin plot of keys vs. popularity
+ggplot(tracks.df, aes(factor(key), popularity)) + 
+  ggtitle("Correlation Between Popularity and Key", ) +
+    ylab("Popularity") +
+    xlab("Key") +
+  geom_violin(fill = 'sienna1') + 
+  geom_point(shape = 1, colour = "black", fill = "white", size = 0.01) +
+  theme(legend.position = "none",
+        panel.background = NULL,
+        plot.title = element_text(size = 16, hjust = 0.5),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        axis.title.y = element_text(size = 14),
+        axis.title.x = element_text(size = 14)
+        )
+
+#need key translations
+```
+Conclusion: No association of popularity with any keys.
+
+boxplots comparing top and bottom 5% of songs in terms of popularity
+```{r}
+library(tidyr)
+library(dplyr)
+
+# Take top 5 most popular tracks in tracks.df
+pop_95.df <- tracks.df %>%
+  select(-c(lyrics, country, available_markets, key, tempo)) %>%
+  filter(popularity > quantile(popularity, 0.95))
+
+# Take bottom 5 least popular tracks in tracks.df
+pop_5.df <- tracks.df %>%
+  select(-c(lyrics, country, available_markets, key, tempo)) %>%
+  filter(popularity < quantile(popularity, 0.05))
+
+# Create column place that identifies each dataframe as either top 5 or bottom 5
+pop_95.df$place <- 'top_5'
+pop_5.df$place <- 'bottom_5'
+
+# Combine the two data frames vertically
+pop.df <- rbind(pop_95.df, pop_5.df)
+
+# Graph boxplot
+pop.df %>% 
+  pivot_longer(., cols = c(acousticness, danceability, duration_scaled, energy, instrumentalness, liveness, loudness_scaled, speechiness, valence, popularity), names_to = "Var", values_to = "Val") %>%
+  ggplot(aes(x = Var, y = Val, fill = place)) +
+  ggtitle("Category Scores for Top 5% vs.\n
+  Bottom 5% Most Popular Tracks") +
+  geom_boxplot() +
+  theme(
+  plot.title = element_text(hjust = 0.5, size = 18),
+  axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 10, hjust = 1),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.border = element_blank(),
+  panel.background = element_blank(),
+  axis.ticks = element_blank(),
+  legend.title = element_blank(),
+  ) +
+  scale_fill_manual(values=c('sienna1', 'mediumpurple1'))
+
+```
+Boxplot summary:  When comparing the bottom 5 vs. the top 5 most popular tracks, the two groups differ on most of the column categories.
+
+Heatmap to show correlation between elements other than popularity
+
+```{r}
+library(reshape2)
+library(ggplot2)
+
+# subset tracks to include only continuous variables
+tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, tempo))
+
+# Create correlation table
+tracks_cor <- round(cor(tracks_onlycontinuous.df, tracks_onlycontinuous.df), 2)
+
+# Get upper triangle of the correlation matrix
+get_upper_tri <- function(tracks_cor){
+  tracks_cor[lower.tri(tracks_cor)]<- NA
+  return(tracks_cor)
+}
+  
+# Apply get_upper_tri to tracks_cor
+upper_tri <- get_upper_tri(tracks_cor)
+
+# Melt the correlation matrix
+tracks_melt <- melt(upper_tri, na.rm = TRUE)
+
+# Create a ggheatmap
+ggplot(tracks_melt, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+    midpoint = 0, limit = c(-1,1), space = "Lab", 
+    name="Pearson\nCorrelation") +
+ggtitle("Correlation Between Numerical Categories") +
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 3) +
+theme(
+  plot.title = element_text(hjust = 0.5),
+  axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 10, hjust = 1),
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.border = element_blank(),
+  panel.background = element_blank(),
+  axis.ticks = element_blank(),
+  legend.justification = c(1, 0),
+  legend.position = c(0.6, 0.7),
+  legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                title.position = "top", title.hjust = 0.5))
 ```
 
 Correlations summary:
 
-Energy and acousticness have a negative -0.71 correlation, loudness and energy have a 0.78 correlation, lyrics and instrumentalness have a 0.51, loudness and acousticness have a -0.58, and valence and danceability have a 0.52.
-
-```{r}
-
-```
-
+Energy and acousticness have a negative -0.72 correlation, loudness and energy have a 0.78 correlation, lyrics and instrumentalness have a 0.51, loudness and acousticness have a -0.58, and valence and danceability have a 0.52.
