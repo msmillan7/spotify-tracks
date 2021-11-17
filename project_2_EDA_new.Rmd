@@ -1,13 +1,26 @@
 ---
 title: "Untitled"
-author: "Richard Bridges"
-date: "11/2/2021"
+author: "Marina Sanchez"
+date: "11/6/2021"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+```{r}
+#install.packages("dplyr")
+#install.packages("viridis")  
+library("viridis")
+library(dplyr)
+library(tidyverse)
+library(ggpubr)
+library(Matrix)
+library(qdapDictionaries)
+library(readxl)
+library(ggplot2)
+```
+
 
 ```{r}
 
@@ -23,7 +36,7 @@ apply(df, 2, function(x) sum(is.na(x) | x == ''))
 ```{r}
 ## Scatterplots for infinite variables vs popularity
 
-tracks.df <- df[,c("acousticness", "danceability", "available_markets", "country", "duration_ms", "energy", "instrumentalness", "liveness", "loudness", "lyrics", "speechiness", "valence", "key", "tempo", "popularity")]
+tracks.df <- df[,c("acousticness", "danceability", "available_markets", "country", "duration_ms", "energy", "instrumentalness", "liveness", "loudness", "lyrics", "speechiness", "valence", "key", "tempo", "popularity", "id")]
 
 
 # data transformations
@@ -45,7 +58,7 @@ upper.panel <- function(x,y){
 pairs(tracks.df[c(15, 1:2)], lower.panel = NULL,
       upper.panel = upper.panel)
 
-tracks.df <- tracks.df[,c("acousticness", "danceability", "available_markets", "country", "duration_scaled", "energy", "instrumentalness", "liveness", "loudness_scaled", "lyrics", "speechiness", "valence", "key", "tempo", "popularity")]
+tracks.df <- tracks.df[,c("acousticness", "danceability", "available_markets", "country", "duration_scaled", "energy", "instrumentalness", "liveness", "loudness_scaled", "lyrics", "speechiness", "valence", "key", "tempo", "popularity", "id")]
 
 
 ##Plots below not to be included - for reference only
@@ -86,7 +99,7 @@ library(corrr)
 library(ggplot2)
 
 # Include on columns with continuous quantitative data
-tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key))
+tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, id))
 
 # Create bar chart of pearson correlation scores
 tracks_onlycontinuous.df %>% correlate() %>% focus(popularity) %>%
@@ -196,7 +209,7 @@ library(reshape2)
 library(ggplot2)
 
 # subset tracks to include only continuous variables
-tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, tempo))
+tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, tempo, id))
 
 # Create correlation table
 tracks_cor <- round(cor(tracks_onlycontinuous.df, tracks_onlycontinuous.df), 2)
@@ -241,3 +254,191 @@ theme(
 Correlations summary:
 
 Energy and acousticness have a negative -0.72 correlation, loudness and energy have a 0.78 correlation, lyrics and instrumentalness have a 0.51, loudness and acousticness have a -0.58, and valence and danceability have a 0.52.
+
+## STUDY OF THE MOST COMMON WORDS IN LYRICS
+### MOST COMMON WORDS IN LYRICS
+```{r}
+#Install packages
+#install.packages("viridis")
+
+#Import Libraries
+library(ggpubr)
+library(Matrix)
+library(qdapDictionaries)
+library(readxl)
+
+#Read stop words list, that contains prepositions, articles and pronouns to be removed from the lyrics
+df.stop_words <- read_excel("D:\\Datos\\Documents\\Development\\R\\Data Munging\\Assignments\\Group Project II - Spotify Tracks\\stop_words.xlsx")
+stop_words <- c(df.stop_words$words)
+
+```
+
+```{r}
+#Create dataframe with only the data in lyrics, id and popularity columns
+df.lyrics <- tracks.df %>% 
+  select(lyrics, id, popularity)
+
+#Preprocessing: lowercasing, smooshing contractions, removing punctuation, numbers, and getting rid of extra spaces
+df.lyrics <- df.lyrics %>% 
+  dplyr::mutate(
+    clean_text = tolower(lyrics),
+    clean_text = gsub("[']", "", clean_text), 
+    clean_text = gsub("[[:punct:]]", " ", clean_text),
+    clean_text = gsub('[[:digit:]]+', " ", clean_text),
+    clean_text = gsub("[[:space:]]+", " ", clean_text),
+    clean_text = trimws(clean_text))
+```
+
+```{r}
+#Convert lyrics into a Document Term Matrix that counts the number of times that each words appear
+
+text <- df.lyrics$clean_text
+doc_id <- df.lyrics$id
+
+#Convert the lyrics of each entry into a list of words (tokens)
+tokns <- strsplit(text, " ", fixed=TRUE)
+
+# Clean tokens before inserting in the matrix
+for (i in 1:length(tokns)){
+  current <- tokns[[i]]
+  # Retrieve only the words contained within the English dictionary
+  current <- current[current %in% GradyAugmented]
+  # Retrieve only meaningful words (clean stop-words: prepositions, articles and pronouns)
+  current <- current[!current %in% stop_words]
+  # Replace into original list of tokens
+  tokns[[i]] <- current 
+}
+
+#Create Document Term Matrix:
+# Rows: Tracks
+# Columns: Words
+# Each position of the matrix [ij] contains how many times the word in column j appears in track of row i
+vocab <- sort(unique(unlist(tokns)))
+dtm <- matrix(data = 0L, 
+              ncol = length(vocab), nrow = length(tokns),
+              dimnames = list(doc_id, vocab) )
+freqs <- lapply(tokns, table)
+for (i in 1:length(freqs) ){
+  doc <- freqs[[i]]
+  dtm[i, names(doc)] <- as.integer(doc)
+}
+
+```
+```{r}
+#install.packages("RColorBrewer")
+library(RColorBrewer)
+
+#Count the total number of occurrences of each word
+words_count <- colSums(dtm)
+#Sort words per number of occurrences
+words_count <- sort(words_count, decreasing=TRUE)
+
+#Get the first 25 words (most occurrences)
+top_25_words <- words_count[0:25]
+
+# Plot the most frequent words contained in the songs
+barplot(sort(top_25_words[1:20]), 
+        ylab = "Words",
+        xlab = "Words frequencies",
+        xlim = c(0,1600),
+        horiz = T,
+        las = 1,
+        names.arg = names(sort(top_25_words[1:20])),
+        col = brewer.pal(20, "Pastel1"),
+        main = "Top 25 words in songs",
+        cex.names = 0.7)
+```
+
+```{r}
+#Generate word-cloud graph
+
+#install.packages("wordcloud")
+#install.packages("RColorBrewer")
+#install.packages("wordcloud2")
+library(wordcloud2)
+library(RColorBrewer)
+library(wordcloud)
+
+top_100_words <- words_count[0:100]
+df.top_100_words <- data.frame(keyName=names(top_100_words), 
+                               count=top_100_words, row.names=NULL)
+
+wordcloud(words = df.top_100_words$keyName, freq = df.top_100_words$count, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+
+### MOST COMMON WORDS IN TOP 100 POPULAR SONGS
+```{r}
+#Arrange dataset according to popularity
+df.popular <- df.lyrics %>% 
+  arrange(desc(popularity))
+
+#Get top 100 popular songs
+df.popular_top_100.lyrics <- df.popular[1:100,] %>% 
+  select(clean_text, id, popularity)
+```
+
+```{r}
+#Convert lyrics into a matrix that counts the number of times that the words appear
+
+text_pop <- df.popular_top_100.lyrics$clean_text
+doc_id_pop <- df.popular_top_100.lyrics$id
+
+#Convert the lyrics of each entry into a list of words (tokens)
+tokns_pop <- strsplit(text_pop, " ", fixed=TRUE)
+
+# Clean tokens
+for (i in 1:length(tokns_pop)){
+  current <- tokns_pop[[i]]
+  # Retrieve only the words contained within the English dictionary
+  current <- current[current %in% GradyAugmented]
+  # Retrieve only meaningful words (clean stop-words: prepositions, articles and pronouns)
+  current <- current[!current %in% stop_words]
+  # Replace into original list of tokens
+  tokns_pop[[i]] <- current 
+}
+
+vocab_pop <- sort(unique(unlist(tokns_pop)))
+dtm_pop <- matrix(data = 0L, 
+              ncol = length(vocab_pop), nrow = length(tokns_pop),
+              dimnames = list(doc_id_pop, vocab_pop) )
+freqs_pop <- lapply(tokns_pop, table)
+for (i in 1:length(freqs_pop) ){
+  doc <- freqs_pop[[i]]
+  dtm_pop[i, names(doc)] <- as.integer(doc)
+}
+```
+
+```{r}
+
+words_count_pop <- colSums(dtm_pop)
+words_count_pop <- sort(words_count_pop, decreasing=TRUE)
+#head(words_count_pop)
+top_100_words_pop <- words_count_pop[0:100]
+
+# Plot the most frequent words contained in the most popular songs
+barplot(sort(top_100_words_pop[1:20]), 
+        ylab = "Words",
+        xlab = "Words frequencies",
+        xlim = c(0,500),
+        horiz = T,
+        las = 1,
+        names.arg = names(sort(top_100_words_pop[1:20])),
+        col = brewer.pal(20, "Pastel2"),
+        main = "Top 20 words in most popular songs",
+        cex.names = 0.7)
+```
+
+```{r}
+#Generate word-cloud graph
+
+df.top_100_words_pop <- data.frame(keyName=names(top_100_words_pop), 
+                                   count=top_100_words_pop, row.names=NULL)
+
+wordcloud(words = df.top_100_words_pop$keyName, freq = df.top_100_words_pop$count, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
