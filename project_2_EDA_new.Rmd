@@ -19,6 +19,8 @@ library(Matrix)
 library(qdapDictionaries)
 library(readxl)
 library(ggplot2)
+library(RColorBrewer)
+library(stringr)
 ```
 
 
@@ -448,3 +450,313 @@ wordcloud(words = df.top_100_words_pop$keyName, freq = df.top_100_words_pop$coun
           colors=brewer.pal(8, "Dark2"))
 ```
 
+## Analysis of Country's Effect on Popularity
+
+The entries in the available markets variable is originally a list saved as a string in the form `{r} tracks.df$available_markets[[3]]`. To provide analysis on this variable we must first convert each entry from a string to a list of strings.
+
+```{r}
+## Changing the Available_Markets variable to lists of strings
+
+x <- tracks.df$available_markets
+
+x <- str_replace_all(x, "\\[", "") 
+x <- str_replace_all(x, "'", "") 
+x <- str_replace_all(x, "]", "") 
+x <- str_split(x, pattern =', ')
+
+tracks.df$countries_list <- x
+
+tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, countries_list))
+```
+
+We then look at which countries appear most often in the dataset.
+
+```{r}
+## Finding how often a country shows up
+
+freq_country <- as.data.frame(table(unlist(countries)))
+names(freq_country)[1:2] <- c("Country", "Frequency")
+freq_country <- freq_country[order(-freq_country$Frequency),]
+rownames(freq_country) <- 1:79
+freq_country$Country <- as.character(freq_country$Country)
+
+## Plot of Occurences
+
+freq_country_cut <- cut(freq_country$Frequency, breaks = quantile(freq_country$Frequency, c(0, .2, .4, .6, .8, 1)), include.lowest = TRUE)
+plot(freq_country_cut)
+
+ggplot(freq_country, aes(x = factor(Country, levels = (Country)), y = Frequency, fill = freq_country_cut))  +
+  ggtitle("Occurrences of Countries in Available Markets") +
+    ylab("Frequency") +
+    xlab("Country") +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_brewer(palette = "Oranges") +
+  coord_cartesian(ylim = c(75000, 95000)) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 16, hjust = 0.5),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, vjust = 1, 
+                               size = 12, hjust = 1),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank()
+  )
+```
+
+As we can see Denmark shows up the most, with roughly 95000 occurrences, and India shows up the least, at roughly 78000 occurrences.
+
+### Checking Popularity Against 5 Most and Least Occurring Markets
+
+We now want to subset the data based on whether a track is available in at least one of the top 5 countries by appearance, is available in all top 5 or is available in at least one of the bottom 5 countries. Then we look at what effect this has on the average popularity of the tracks in each group along with the Pearson correlation of each variable with respect to popularity. The first plot is the value of these attributes for each group and includes the corresponding values from the total data set. For visualization, the second plot is the difference of each group's attributes from the total data set.
+
+```{r}
+## Subsetting into lists of top 5 countries and bottom 5 countries
+
+top_5_country <- subset(freq_country$Country, freq_country$Frequency >= freq_country$Frequency[freq_country$Country == "IS"])
+bot_5_country <- subset(freq_country$Country, freq_country$Frequency <= freq_country$Frequency[freq_country$Country == "AU"])
+
+
+## Top 5 Countries
+top_5_indicator <- c()
+
+for (entry in 1:length(countries)){
+ top_5_indicator <- c(top_5_indicator, sum(top_5_country %in% tracks.df$countries_list[[entry]]) >= 1)
+}
+
+tracks_top5country.df <- filter(tracks.df, top_5_indicator)
+
+tracks_top5_onlycontinuous.df <- subset(tracks_top5country.df, select = -c(lyrics, country, available_markets, key, countries_list))
+
+### Analysis of subsetting and effect on popularity
+top_5mean <- mean(tracks_top5_onlycontinuous.df$popularity)
+top_5mean_diff <- abs(mean(tracks_onlycontinuous.df$popularity) - top_5mean)
+
+cor_tracks <- cor(tracks_onlycontinuous.df, tracks_onlycontinuous.df$popularity)
+cor_top_5 <- cor(tracks_top5_onlycontinuous.df, tracks_top5_onlycontinuous.df$popularity)
+
+top_5cor <- cor_tracks - cor_top_5
+
+## If an entry has all 5 top countries
+
+bt_5_indicator <- c()
+
+for (entry in 1:length(countries)){
+  bt_5_indicator <- c(bt_5_indicator, sum(top_5_country %in% tracks.df$countries_list[[entry]]) ==5)
+}
+
+tracks_bt5country.df <- filter(tracks.df, bt_5_indicator)
+
+tracks_bt5_onlycontinuous.df <- subset(tracks_bt5country.df, select = -c(lyrics, country, available_markets, key, countries_list))
+
+### Analysis of subsetting and effect on popularity
+bt_5mean <- mean(tracks_bt5_onlycontinuous.df$popularity)
+bt_5mean_diff <- abs(mean(tracks_onlycontinuous.df$popularity) -  bt_5mean)
+
+cor_bt_5 <- cor(tracks_bt5_onlycontinuous.df, tracks_bt5_onlycontinuous.df$popularity)
+
+bt_5cor <- cor_tracks - cor_bt_5
+
+## Bottom 5 Countries
+
+bot_5_indicator <- c()
+
+for (entry in 1:length(countries)){
+  bot_5_indicator <- c(bot_5_indicator, sum(bot_5_country %in% tracks.df$countries_list[[entry]]) >= 1)
+}
+
+tracks_bot5country.df <- filter(tracks.df, bot_5_indicator)
+
+tracks_bot5_onlycontinuous.df <- subset(tracks_bot5country.df, select = -c(lyrics, country, available_markets, key, countries_list))
+
+### Analysis of subsetting and effect on popularity
+
+bot_5mean <- mean(tracks_bot5_onlycontinuous.df$popularity)
+bot_5mean_diff <- abs(mean(tracks_onlycontinuous.df$popularity) - bot_5mean)
+
+cor_bot_5 <- cor(tracks_bot5_onlycontinuous.df, tracks_bot5_onlycontinuous.df$popularity)
+
+bot_5cor <- cor_tracks - cor_bot_5
+
+## Plot of the correlations versus popularity and mean of popularity against each data set
+
+comptracks.df <- data.frame(row.names(top_5cor), cor_top_5, cor_bt_5, cor_bot_5, cor_tracks)
+new_comptracks.df <- rbind(comptracks.df, c("mean", top_5mean, bt_5mean, bot_5mean, mean(tracks_onlycontinuous.df$popularity)))
+row.names(new_comptracks.df)[1:11] <- 1:11
+names(new_comptracks.df) <- c("Category", "Top_5", "All_5", "Bottom_5", "All")
+
+new_comptracks.df <- transform(new_comptracks.df[-11,], Top_5 = as.numeric(Top_5), All_5 = as.numeric(All_5), Bottom_5 = as.numeric(Bottom_5), All = as.numeric(All))
+
+new_comptracks.df %>%
+  pivot_longer(!Category, names_to = "Type", values_to = "Value") %>%
+  ggplot(aes(x = Category, y = Value, fill = Type)) +
+    ggtitle("Difference of Correlation and Mean of Popularity by Available Markets") +
+    geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+    ylab("Value") +
+    xlab("Variable") +
+    scale_fill_brewer(palette = "Purples") +
+    theme(
+      plot.title = element_text(size = 16, hjust = 0.5),
+      axis.text.y = element_text(size = 12),
+      axis.text.x = element_text(angle = 45, vjust = 1, 
+                                 size = 12, hjust = 1),
+      axis.title.y = element_text(size = 14),
+      axis.title.x = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank())
+
+## Plot of the differences of the previous data sets with the original data
+
+diff.df <- data.frame(row.names(top_5cor), top_5cor, bt_5cor, bot_5cor)
+new_diff.df <- rbind(diff.df, c("mean_difference", top_5mean_diff, bt_5mean_diff, bot_5mean_diff))
+row.names(new_diff.df)[1:11] <- 1:11
+names(new_diff.df) <- c("Category","Top_5", "All_5", "Bottom_5")
+
+new_diff.df <- transform(new_diff.df[-11,], Top_5 = as.numeric(Top_5), All_5 = as.numeric(All_5), Bottom_5 = as.numeric(Bottom_5))
+
+new_diff.df %>%
+  pivot_longer(!Category, names_to = "Type", values_to = "Value") %>%
+  ggplot(aes(x = Category, y = Value, fill = Type)) +
+  ggtitle("Difference of Correlation and Mean of Popularity by Available Markets") +
+  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+  ylab("Difference from Population") +
+  xlab("Variable") +
+  scale_fill_brewer(palette = "Purples") +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, vjust = 1, 
+                               size = 12, hjust = 1),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank())
+```
+
+From the second plot we can see that the difference in the correlations for duration, energy, loudness and speechiness in the tracks that appear in all 5 of the top countries is the furthest from the correlations for the entire population. Danceability, tempo and, to a lesser degree, the popularity mean are closest to the population's for each country group. Noticeably, all of the differences, except for instrumentalness, share the same sign accross the groupings.
+
+## Analysis of Popularity by Track's Country of Origin
+
+We then want to look at the potential influence of where the track was originally created. The methodology will follow from the previous analysis, subsetting on the three countries listed in country.
+
+```{r}
+## Subsetting based on original country
+
+table(tracks.df$country)
+
+country_mean <- tracks.df[,-c(3,10)] %>%
+  group_by(country) %>%
+  summarise(mean(popularity)) %>%
+  data.frame()
+
+country_mean <- t(rbind(country_mean, c("All", mean(tracks.df$popularity))))
+
+tracks_cor <- tracks_onlycontinuous.df %>% 
+  correlate() %>% 
+  focus(popularity)
+tracks_cor <- data.frame(tracks_cor)
+colnames(tracks_cor) <- c("Category", "All")
+
+## Plotting the correlations versus popularity and mean popularity against country
+
+country_tracks.df <- data.frame(row.names = tracks_cor$Category)
+
+for (entry in unique(tracks.df$country)){
+  country_cor <- tracks.df[,-c(3,10, 13)] %>%
+    filter(country == entry) %>%
+    select(which(sapply(., is.numeric))) %>%
+    correlate() %>%
+    focus(popularity) %>%
+    data.frame()
+  country_tracks.df[entry] <- country_cor[2]
+}
+
+country_tracks.df$All <- tracks_cor$All
+country_tracks.df$Category <- row.names(country_tracks.df)
+country_tracks.df <- rbind(country_tracks.df, country_mean[2,1:4])
+country_tracks.df$Category[11] <- "mean"
+row.names(country_tracks.df) <- 1:11
+
+country_tracks.df <- transform(country_tracks.df, BE = as.numeric(BE), AR = as.numeric(AR), FI = as.numeric(FI), All = as.numeric(All))
+
+country_tracks.df %>%
+  pivot_longer(!Category, names_to = "Type", values_to = "Value") %>%
+  ggplot(aes(x = Category, y = Value, fill = Type)) +
+  ggtitle("Correlation Between Popularity and Mean Popularity by Country") +
+  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+  ylab("Value") +
+  xlab("Variable") +
+  scale_fill_brewer(palette = "YlGnBu") +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, vjust = 1, 
+                               size = 12, hjust = 1),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank())
+
+## Plotting the differences
+
+country_mean_diff <- tracks.df[,-c(3,10)] %>%
+  group_by(country) %>%
+  summarise(mean_pop = mean(tracks.df$popularity) - mean(popularity)) %>%
+  data.frame()%>%
+  t()
+
+country_diff.df <- data.frame(row.names = tracks_cor$Category)
+
+for (entry in unique(tracks.df$country)){
+  country_diff <- tracks.df[,-c(3,10, 13)] %>%
+  filter(country == entry) %>%
+  select(which(sapply(., is.numeric))) %>%
+  correlate() %>%
+  focus(popularity) %>%
+  data.frame()
+  country_diff.df[entry] <- country_diff[2] - tracks_cor[2]
+}
+
+country_diff.df$Category <- row.names(country_diff.df)
+country_diff.df <- rbind(country_diff.df, country_mean_diff[2,1:3])
+country_diff.df$Category[11] <- "mean_difference"
+row.names(country_diff.df) <- 1:11
+
+country_diff.df <- transform(country_diff.df, BE = as.numeric(BE), AR = as.numeric(AR), FI = as.numeric(FI))
+
+country_diff.df %>%
+  pivot_longer(!Category, names_to = "Type", values_to = "Value") %>%
+  ggplot(aes(x = Category, y = Value, fill = Type)) +
+  ggtitle("Difference of Correlation and Mean of Popularity by Country") +
+  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+  ylab("Difference from Population") +
+  xlab("Variable") +
+  scale_fill_brewer(palette = "YlGnBu") +
+  theme(
+    plot.title = element_text(size = 16, hjust = 0.5),
+    axis.text.y = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, vjust = 1, 
+                               size = 12, hjust = 1),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank())
+```
+
+By the looking at the plots we can see that in tracks from Belgium, the correlation between popularity and acousticness, loudness and speechiness are stronger than the population and the tracks are on average more popular than all other tracks (in the entire population and from one of the other country groups). Finland appears to have the most correlations closest to the population correlations with the exception of liveness where is has the lowest correlation with popularity. Songs from Finland also have the largest difference in average popularity and (rather sadly) are least popular by any group. Of the groups, Argentina has the highest correlation for instumentalness and duration.
