@@ -1,6 +1,6 @@
 ---
-title: "Untitled"
-author: "Marina Sanchez"
+title: "Spotify Tracks Popularity - Exploratory Data Analysis"
+author: "Richard Bridges, Conor Welch and Marina Sanchez"
 date: "11/6/2021"
 output: html_document
 ---
@@ -8,9 +8,17 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+# Introduction
+Have you ever thought about what characteristics popular songs share?
+Music is something that everybody listens to. It exists in a variety of different forms and genres and is an art form that people resonate with on a very personal level. This makes it especially interesting to analyze as not just a cultural product, but also, thanks to modern-day analytics, as a data product. Companies such as Spotify have pioneered this kind of analysis and music curation.
+In this analysis, we will explore how the content of songs, both lyrically and musically, and its regional availability, determine the popularity of the track.
+
+
 ```{r}
 #install.packages("dplyr")
 #install.packages("viridis")  
+#install.packages("corrr") 
 library("viridis")
 library(dplyr)
 library(tidyverse)
@@ -21,11 +29,13 @@ library(readxl)
 library(ggplot2)
 library(RColorBrewer)
 library(stringr)
+library(stringr)
 ```
 
 
 ## Data import and measurement of completeness
 
+The first step is to retrieve the NAs and empty values contained in the data set
 ```{r}
 
 #read in data and check for NaNs
@@ -36,7 +46,40 @@ apply(df, 2, function(x) sum(is.finite(x)))
 apply(df, 2, function(x) sum(is.na(x) | x == ''))
 
 ```
+
+As we can see, the data set is complete.
+
 ## Scaling and Normalization
+
+In this section we are cleaning the data by retrieving only the data of interest and performing some normalization process on the values. The main attributes (metrics) of interest are the following:
+
+1. Popularity: numeric measure of popularity of song from Spotify (Spotify’s own calculation of popularity likely based on a variety of factors such as number of streams, unique streams, etc.).
+
+2. Danceability: how suitable a track is for dancing based on a combination of musical elements including tempo, rhythm stability, beat strength, and overall regularity (low 0 to high 1).
+
+3. Energy: perceptual measure of intensity and activity. Typically, energetic tracks feel fast, loud, and noisy. For example, death metal has high energy, while a Bach prelude scores low on the scale. Perceptual features contributing to this attribute include dynamic range, perceived loudness, timbre, onset rate, and general entropy.
+
+4. Key: The estimated overall key of the track. Integers map to pitches using standard Pitch Class notation . E.g. 0 = C, 1 = C?/D?, 2 = D, and so on. If no key was detected, the value is -1.
+
+5. Speechiness: presence of spoken words in a track. The more exclusively speech-like the recording (e.g. talk show, audio book, poetry), the closer to 1.0 the attribute value.
+
+6. Acousticness: a confidence measure from 0.0 to 1.0 of whether the track is acoustic. 1.0 represents high confidence the track is acoustic.
+
+7. Instrumentalness: predicts whether a track contains no vocals. “Ooh” and “aah” sounds are treated as instrumental in this context. Rap or spoken word tracks are clearly “vocal”. The closer the instrumentalness value is to 1.0.
+
+8. Valence: a measure from 0.0 to 1.0 describing the musical positiveness conveyed by a track. Tracks with high valence sound more positive (e.g. happy, cheerful, euphoric), while tracks with low valence sound more negative (e.g. sad, depressed, angry).
+
+9. Liveness: Detects the presence of an audience in the recording. Higher liveness values represent an increased probability that the track was performed live. A value above 0.8 provides strong likelihood that the track is live.
+
+10. Loudness: The overall loudness of a track in decibels (dB). Loudness values are averaged across the entire track and are useful for comparing relative loudness of tracks. Loudness is the quality of a sound that is the primary psychological correlate of physical strength (amplitude). Values typical range between -60 and 0 db.
+
+11. Duration: Duration of the track.
+
+12. Tempo: overall estimated tempo of a track in beats per minute (BPM).
+
+13. Lyrics
+
+14. Available markets: Regions where the song is available
 
 ```{r}
 ## Scatterplots for infinite variables vs popularity
@@ -49,49 +92,11 @@ tracks.df$popularity <- tracks.df$popularity/100
 tracks.df$duration_scaled <- tracks.df$duration_ms/5505831
 tracks.df$loudness_scaled <- (tracks.df$loudness + 60)/62.719
 
-# display r correlations on plots
-# upper.panel <- function(x,y){
-#   points(x,y, pch=1)
-#   r <- round(cor(x,y), digits = 2)
-#   txt <- paste0("R = ", r)
-#   usr <- par("usr"); on.exit(par(usr))
-#   par(usr = c(0, 1, 0, 1))
-#   text(0.5, 0.9, txt)
-# }
-
+# Rewrite dataframe with transformed values
 tracks.df <- tracks.df[,c("acousticness", "danceability", "available_markets", "country", "duration_scaled", "energy", "instrumentalness", "liveness", "loudness_scaled", "lyrics", "speechiness", "valence", "key", "tempo", "popularity", "id")]
 
-
-##Plots below not to be included - for reference only
-# display r correlations on plots
-# upper.panel <- function(x,y){
-#   points(x,y, pch=1)
-#   r <- round(cor(x,y), digits = 2)
-#   txt <- paste0("R = ", r)
-#   usr <- par("usr"); on.exit(par(usr))
-#   par(usr = c(0, 1, 0, 1))
-#   text(0.5, 0.9, txt)
-# }
-
-# scatter plots - arranged 3 x 3 for clarity
-# pairs(tracks.df[c(15, 1:2)], lower.panel = NULL,
-#       upper.panel = upper.panel)
-# 
-# pairs(tracks.df[c(15, 13:14)], lower.panel = NULL,
-#       upper.panel = upper.panel)
-# 
-# pairs(tracks.df[c(15, 5:6)], lower.panel = NULL,
-#       upper.panel = upper.panel)
-# 
-# pairs(tracks.df[c(15, 7:8)], lower.panel = NULL,
-#       upper.panel = upper.panel)
-# 
-# pairs(tracks.df[c(15, 9:10)], lower.panel = NULL,
-#       upper.panel = upper.panel)
-# 
-# pairs(tracks.df[c(15, 11:12)], lower.panel = NULL,
-#       upper.panel = upper.panel)
 ```
+
 The data set underwent the following transformations:
 1.  Popularity was scaled down so that each observation fell between 0 and 1.
 2.  Duration was scaled by dividing by the longest track in the data set (5505831 ms) so that each play times, similarly, fell between 0 and 1.
@@ -137,6 +142,7 @@ tracks_onlycontinuous.df %>% correlate() %>% focus(popularity) %>%
       axis.ticks = element_blank()
     )
 ```
+
 Our initial objective was to explore the data and find which categories, if any, correlated with popularity.  Perhaps as to be expected with a topic as subject to personal tastes and as varied in its presentation and interpretability as music, there were no correlations between popularity and any of the quantitative variables in the data set.  Because there were both so many categories and observations in the data set, pairwise correlation plots would not have been a feasible graphical presentation of association as the details of the plots would have been obscured.  Instead, a bar graph of r^2 values is presented that shows the degree of correlation between the quantitative variables in the data set and popularity.
 
 
@@ -164,6 +170,7 @@ ggplot(tracks.df, aes(factor(key), popularity)) +
         axis.title.x = element_text(size = 14)
         )
 ```
+
 In addition to the correlation analyses described above, the degree of popularity as a function of musical key (a discrete variable) was also examined.  Here a violin plot is presented of the degree of popularity of songs in the 12 keys of a musical octave.  Quite surprisingly, the average degree of popularity of any one key or keys was not much greater than that of any other key, though the range of popularities for some keys were wider than others.  An interesting feature of the geom_violin object is the option to pass 'scale = "count"' as an argument, which sizes the width of an individual plot in proportion with the number of observations corresponding to its categorical variable.  In this plot, one can observe that the most common keys for songs in the database are C, D, G, and A while the least common keys are D#, G#, and A#.
 
 ## Correlation between quantitative variables (all observations)
@@ -214,6 +221,7 @@ theme(
   guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
                 title.position = "top", title.hjust = 0.5))
 ```
+
 This figure examines the pairwise correlation between all categories in the data set, not just popularity.  The data is presented in a heat map with correlation coefficients appearing inside each of the boxes.  Red coloration indicates a positive correlation while blue coloration indicates a negative correlation.  Energy and acousticness have a negative -0.72 correlation, loudness and energy have a 0.78 correlation, lyrics and instrumentalness have a 0.51, loudness and acousticness have a -0.58, and valence and danceability have a 0.52.
 
 ## Comparison of quantitative variables in subsets of most popular and least popular tracks
@@ -261,27 +269,22 @@ pop.df %>%
   scale_fill_manual(values=c('sienna1', 'mediumpurple1'))
 
 ```
+
 Because there was not a great deal of correlation between variables that would lead to any sort of interesting examination when considering the entire set of observations, the decision was made to contrast data between two populations within the data set.  Instead of considering the data set in its entirety, this figure subsets the tracks into the top 5 percentile and bottom 5 percentile in terms of popularity and compares them to each other on the same set of quantitative variables examined in the first figure.  When comparing the top 5 and bottom 5 most popular tracks a number of interesting differences arises.  The top 5 tracks tend to score less in acousticness and speechiness but more in energy and loudness.  The distribution of data points in some of the categories is also quite intriguing.  There are many categories for which most of the observations are confined to a narrow band with many outliers appearing above or below that band.  For example, while the average play times of the most popular tracks and least popular tracks are fairly similar and tend towards the lower end of the scale, the outliers for the two groupings are quite different.  The outliers for the most popular tracks appear in a cluster in close proximity to the average but the outliers for the least popular tracks stretch far above the average.  For both the popular and unpopular songs, average instrumentalness ratings hover close to zero but outliers can streth all the way to one.
 
-## STUDY OF THE MOST COMMON WORDS IN LYRICS
-### MOST COMMON WORDS IN LYRICS
-```{r}
-#Install packages
-#install.packages("viridis")
+## Tracks Lyrics vs. Popularity Analysis
 
+The main purpose of this section is to perform an analysis of the most frequent words contained in the lyrics of the songs.
+First, we have retrieved the most common words of all the songs contained within the data set.
+Then, we have performed the same process but considering only the top 100 most popular songs of the data set.
+
+```{r}
 #Import Libraries
 library(ggpubr)
 library(Matrix)
 library(qdapDictionaries)
 library(readxl)
 
-#Read stop words list, that contains prepositions, articles and pronouns to be removed from the lyrics
-df.stop_words <- read_excel("D:\\Datos\\Documents\\Development\\R\\Data Munging\\Assignments\\Group Project II - Spotify Tracks\\stop_words.xlsx")
-stop_words <- c(df.stop_words$words)
-
-```
-
-```{r}
 #Create dataframe with only the data in lyrics, id and popularity columns
 df.lyrics <- tracks.df %>% 
   select(lyrics, id, popularity)
@@ -295,7 +298,31 @@ df.lyrics <- df.lyrics %>%
     clean_text = gsub('[[:digit:]]+', " ", clean_text),
     clean_text = gsub("[[:space:]]+", " ", clean_text),
     clean_text = trimws(clean_text))
+
+#Read stop words list, that contains prepositions, articles and pronouns to be removed from the lyrics
+df.stop_words <- read_excel("stop_words.xlsx")
+stop_words <- c(df.stop_words$words)
 ```
+
+In this first section, we have retrieved the columns of interest for this study (lyrics, id and popularity) from the main data frame.
+Then we have perform some transformations on the lyrics column.
+  1. Convert all characters to lowercase
+  2. Remove punctuation
+  3. Remove numbers
+  4. Remove extra spaces
+  5. Remove Leading/Trailing spaces
+
+Finally, we have read a file that contains the words that we don't want to take into account in the analysis process, such as prepositions, articles and pronouns. We will use this data for filtering only the words of interest to be analysed.
+
+### Most frequent words
+For counting the number of occurrences of each in each of the tracks, we have parsed the "lyrics" column of the dataframe. 
+
+  1. For each of the tracks, we have split the lyrics word by word (tokens) and stored them into a list.
+  2. Once we have all the lyrics split and stored word by word, we have removed those tokens that either are not in the English dictionary or are contained within the stop-words list imported above.
+  3. Once we only have the meaningful tokens, we have used a document term matrix that has the following structure:
+    - Rows: Each row i belongs to a track is.
+    - Columns: Each column j contains a token (word)
+    - Each position of the matrix [ij] contains how many times the word in column j appears in track of row i
 
 ```{r}
 #Convert lyrics into a Document Term Matrix that counts the number of times that each words appear
@@ -305,58 +332,61 @@ doc_id <- df.lyrics$id
 
 #Convert the lyrics of each entry into a list of words (tokens)
 tokns <- strsplit(text, " ", fixed=TRUE)
-
-# Clean tokens before inserting in the matrix
-for (i in 1:length(tokns)){
-  current <- tokns[[i]]
-  # Retrieve only the words contained within the English dictionary
-  current <- current[current %in% GradyAugmented]
-  # Retrieve only meaningful words (clean stop-words: prepositions, articles and pronouns)
-  current <- current[!current %in% stop_words]
-  # Replace into original list of tokens
-  tokns[[i]] <- current 
-}
-
-#Create Document Term Matrix:
-# Rows: Tracks
-# Columns: Words
-# Each position of the matrix [ij] contains how many times the word in column j appears in track of row i
-vocab <- sort(unique(unlist(tokns)))
-dtm <- matrix(data = 0L, 
-              ncol = length(vocab), nrow = length(tokns),
-              dimnames = list(doc_id, vocab) )
-freqs <- lapply(tokns, table)
-for (i in 1:length(freqs) ){
-  doc <- freqs[[i]]
-  dtm[i, names(doc)] <- as.integer(doc)
-}
+# 
+# # Clean tokens before inserting in the matrix
+# for (i in 1:length(tokns)){
+#   current <- tokns[[i]]
+#   # Retrieve only the words contained within the English dictionary
+#   current <- current[current %in% GradyAugmented]
+#   # Retrieve only meaningful words (clean stop-words: prepositions, articles and pronouns)
+#   current <- current[!current %in% stop_words]
+#   # Replace into original list of tokens
+#   tokns[[i]] <- current
+# }
+# 
+# #Create Document Term Matrix:
+# # Rows: Tracks
+# # Columns: Words
+# # Each position of the matrix [ij] contains how many times the word in column j appears in track of row i
+# vocab <- sort(unique(unlist(tokns)))
+# dtm <- matrix(data = 0L,
+#               ncol = length(vocab), nrow = length(tokns),
+#               dimnames = list(doc_id, vocab) )
+# freqs <- lapply(tokns, table)
+# for (i in 1:length(freqs) ){
+#   doc <- freqs[[i]]
+#   dtm[i, names(doc)] <- as.integer(doc)
+# }
 
 ```
+
+The following barplot shows the top 25 words with more occurrences in the lyrics, taking into consideration all the songs within the data set.
 ```{r}
 #install.packages("RColorBrewer")
 library(RColorBrewer)
 
 #Count the total number of occurrences of each word
-words_count <- colSums(dtm)
-#Sort words per number of occurrences
-words_count <- sort(words_count, decreasing=TRUE)
-
-#Get the first 25 words (most occurrences)
-top_25_words <- words_count[0:25]
-
-# Plot the most frequent words contained in the songs
-barplot(sort(top_25_words[1:20]), 
-        ylab = "Words",
-        xlab = "Words frequencies",
-        xlim = c(0,1600),
-        horiz = T,
-        las = 1,
-        names.arg = names(sort(top_25_words[1:20])),
-        col = brewer.pal(20, "Pastel1"),
-        main = "Top 25 words in songs",
-        cex.names = 0.7)
+# words_count <- colSums(dtm)
+# #Sort words per number of occurrences
+# words_count <- sort(words_count, decreasing=TRUE)
+# 
+# #Get the first 25 words (most occurrences)
+# top_25_words <- words_count[0:25]
+# 
+# # Plot the most frequent words contained in the songs
+# barplot(sort(top_25_words[1:20]), 
+#         ylab = "Words",
+#         xlab = "Words frequencies",
+#         xlim = c(0,1600),
+#         horiz = T,
+#         las = 1,
+#         names.arg = names(sort(top_25_words[1:20])),
+#         col = brewer.pal(20, "Pastel1"),
+#         main = "Top 25 words in songs",
+#         cex.names = 0.7)
 ```
 
+The wordcloud below shows the top 100 words used in the songs, with larger words meaning more occurrences. 
 ```{r}
 #Generate word-cloud graph
 
@@ -367,17 +397,19 @@ library(wordcloud2)
 library(RColorBrewer)
 library(wordcloud)
 
-top_100_words <- words_count[0:100]
-df.top_100_words <- data.frame(keyName=names(top_100_words), 
-                               count=top_100_words, row.names=NULL)
-
-wordcloud(words = df.top_100_words$keyName, freq = df.top_100_words$count, min.freq = 1,
-          max.words=200, random.order=FALSE, rot.per=0.35, 
-          colors=brewer.pal(8, "Dark2"))
+# top_100_words <- words_count[0:100]
+# df.top_100_words <- data.frame(keyName=names(top_100_words), 
+#                                count=top_100_words, row.names=NULL)
+# 
+# wordcloud(words = df.top_100_words$keyName, freq = df.top_100_words$count, min.freq = 1,
+#           max.words=200, random.order=FALSE, rot.per=0.35, 
+#           colors=brewer.pal(8, "Dark2"))
 ```
 
 
-### MOST COMMON WORDS IN TOP 100 POPULAR SONGS
+### Most frequent words in Top 100 popular songs
+
+For this section, we have followed the same approach, but this time taking into consideration only the 100 most popular songs of the dataset.
 ```{r}
 #Arrange dataset according to popularity
 df.popular <- df.lyrics %>% 
@@ -388,6 +420,7 @@ df.popular_top_100.lyrics <- df.popular[1:100,] %>%
   select(clean_text, id, popularity)
 ```
 
+Again, we have build a document term matrix to store the number of occurrences of each word per track.
 ```{r}
 #Convert lyrics into a matrix that counts the number of times that the words appear
 
@@ -419,6 +452,7 @@ for (i in 1:length(freqs_pop) ){
 }
 ```
 
+The following bar plot and word-cloud graphs show the most common words used in the top 100 popular songs
 ```{r}
 
 words_count_pop <- colSums(dtm_pop)
@@ -450,6 +484,11 @@ wordcloud(words = df.top_100_words_pop$keyName, freq = df.top_100_words_pop$coun
           colors=brewer.pal(8, "Dark2"))
 ```
 
+The bar plot and the wordcloud above show the top words in top 100 popular songs (with larger words meaning more occurrences in the wordcloud). 
+It makes sense to find the words "yeah" and "oh" as the most frequent, based on the style and content of the songs that we can hear on the radio nowadays.
+On the other hand, love has always been the main topic in most of popular songs, so we are not surprised about finding "Love" as one of the most frequent words. Many of the other popular words are pretty commonly found words that follow the theme of “love”. “Like” and “baby”, "kiss", "Need" are also high on the list as they also fall into this general romance bucket.
+Most of the other top words are pretty common words: want, know, come, cause, make, get, etc. A lot of these tend to be verbs that connect parts of lyrics and likely occur at higher rates because they are short and easy to use in lyrics. Other words such as “eh” and “hey” are common filler words.
+
 ## Analysis of Country's Effect on Popularity
 
 The entries in the available markets variable is originally a list saved as a string in the form `{r} tracks.df$available_markets[[3]]`. To provide analysis on this variable we must first convert each entry from a string to a list of strings.
@@ -466,14 +505,14 @@ x <- str_split(x, pattern =', ')
 
 tracks.df$countries_list <- x
 
-tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, countries_list))
+tracks_onlycontinuous.df <- subset(tracks.df, select = -c(lyrics, country, available_markets, key, countries_list, id))
 ```
 
 We then look at which countries appear most often in the dataset.
 
 ```{r}
 ## Finding how often a country shows up
-
+countries <- tracks.df$countries_list
 freq_country <- as.data.frame(table(unlist(countries)))
 names(freq_country)[1:2] <- c("Country", "Frequency")
 freq_country <- freq_country[order(-freq_country$Frequency),]
@@ -530,7 +569,7 @@ for (entry in 1:length(countries)){
 
 tracks_top5country.df <- filter(tracks.df, top_5_indicator)
 
-tracks_top5_onlycontinuous.df <- subset(tracks_top5country.df, select = -c(lyrics, country, available_markets, key, countries_list))
+tracks_top5_onlycontinuous.df <- subset(tracks_top5country.df, select = -c(lyrics, country, available_markets, key, countries_list, id))
 
 ### Analysis of subsetting and effect on popularity
 top_5mean <- mean(tracks_top5_onlycontinuous.df$popularity)
@@ -551,7 +590,7 @@ for (entry in 1:length(countries)){
 
 tracks_bt5country.df <- filter(tracks.df, bt_5_indicator)
 
-tracks_bt5_onlycontinuous.df <- subset(tracks_bt5country.df, select = -c(lyrics, country, available_markets, key, countries_list))
+tracks_bt5_onlycontinuous.df <- subset(tracks_bt5country.df, select = -c(lyrics, country, available_markets, key, countries_list, id))
 
 ### Analysis of subsetting and effect on popularity
 bt_5mean <- mean(tracks_bt5_onlycontinuous.df$popularity)
@@ -571,7 +610,7 @@ for (entry in 1:length(countries)){
 
 tracks_bot5country.df <- filter(tracks.df, bot_5_indicator)
 
-tracks_bot5_onlycontinuous.df <- subset(tracks_bot5country.df, select = -c(lyrics, country, available_markets, key, countries_list))
+tracks_bot5_onlycontinuous.df <- subset(tracks_bot5country.df, select = -c(lyrics, country, available_markets, key, countries_list, id))
 
 ### Analysis of subsetting and effect on popularity
 
